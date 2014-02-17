@@ -11,6 +11,12 @@
 // Rolf R Bakke
 // R.Schlohan
 // BMP085 Extended Example Code by: Jim Lindblom (SparkFun Electronics)
+// BMP - Arduino
+// GND - GND
+// 3.3 - 3.3
+// SDA - A4
+// SCL - A5
+
 
 
 #include <Wire.h> // I2C to communiucate with the sensor
