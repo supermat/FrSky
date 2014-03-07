@@ -51,8 +51,8 @@ float altitude;
 const int AverageValueCount=10;         // the number of values that will be used to calculate a new average value
 int count=0;
 long pressure_values[AverageValueCount];// Aray to store the previous pressure values
-const float p0 = 101325;     // Pressure at sea level (Pa)
-
+//const float p0 = 101325;     // Pressure at sea level (Pa)
+float p0 = 101325;
 
 #define PIN_SerialTX 2       // the pin to transmit the serial data to the frsky telemetry enabled receiver
 #define PIN_Led 13
@@ -120,6 +120,11 @@ void setup() {
   //SendValue(FRSKY_USERDATA_VOLTAGE_B,0);
   //SendValue(FRSKY_USERDATA_VOLTAGE_A,0);
   //SendValue(FRSKY_USERDATA_CURRENT,3);
+  delay(1000);
+  altitude=getAltitude();
+  p0 = pressure;
+  Serial.print("On met l'altitude à 0. Pression au point 0 : ");
+  Serial.println(p0);
 }
 
 short n=0;
