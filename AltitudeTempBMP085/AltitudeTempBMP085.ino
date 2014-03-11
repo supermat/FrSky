@@ -44,9 +44,10 @@ int md;
 long b5; 
 
 short temperature; // Temperature, in 0.1 degrees.
-short max_temp; // Maximum Temperature, in 0.1 degrees.
+short max_temp,min_temp; // Maximum Temperature, in 0.1 degrees.
 long pressure; // in Pa
 float altitude;
+short max_altitude;
 //uint16_t max_alt=0;
 const int AverageValueCount=10;         // the number of values that will be used to calculate a new average value
 int count=0;
@@ -117,19 +118,24 @@ void setup() {
   bmp085Calibration();
   for (int i=0;i<AverageValueCount;i++) pressure_values[i]=p0;     
   max_temp=-999;
+  min_temp=999;
+  max_altitude = 0;
   //SendValue(FRSKY_USERDATA_VOLTAGE_B,0);
   //SendValue(FRSKY_USERDATA_VOLTAGE_A,0);
   //SendValue(FRSKY_USERDATA_CURRENT,3);
-  delay(1000);
+  delay(2000);
   altitude=getAltitude();
   p0 = pressure;
   Serial.print("On met l'altitude à 0. Pression au point 0 : ");
   Serial.println(p0);
+  getAltitude();
+  startMillis = millis();
 }
 
 short n=0;
 void loop() {
    altitude=getAltitude();
+   
 #ifdef DEBUG
   n++;
 #endif
@@ -137,16 +143,24 @@ void loop() {
   if( (lastMillisFrame1 + 300) <=millis()) {
   ledOn();
   SendAlt(altitude);
+   SendValue(FRSKY_USERDATA_TEMP2 , max_altitude);
     lastMillisFrame1=millis();
    ledOff();  
 
 
   // Frame to send every 2s
   if( (lastMillisFrame2 + 2000) <=millis()) {
-    //SendCellVoltage(0,ReadVoltage(PIN_VoltageCell1));
-    //SendCellVoltage(1,ReadVoltage(PIN_VoltageCell2));
+    if (altitude>max_altitude && altitude - 10 < max_altitude) max_altitude=altitude;
+    SendCellVoltage(0,ReadVoltage(PIN_VoltageCell1));
+    SendCellVoltage(1,ReadVoltage(PIN_VoltageCell2));
     //SendCellVoltage(2,ReadVoltage(PIN_VoltageCell3));
+    //SendCellVoltage(0,850);
+    //SendCellVoltage(1,852);
     SendSec();
+    if( ((millis() - startMillis) / 60000) != ((lastMillisFrame2 - startMillis) / 60000))
+    {
+      SendHourMinutes();
+    }
 #ifdef DEBUG
     Serial.print("Temperature: ");
     Serial.print(temperature, DEC);
@@ -160,7 +174,10 @@ void loop() {
     Serial.println(" m");
     Serial.println((millis()-lastMillisFrame2)/n);
     Serial.println(n);n=0;
-    Serial.println();
+    Serial.print("vcc = ");
+    Serial.println(readVccMv());
+    Serial.print("Cell1 = ");
+    Serial.println(ReadVoltage(PIN_VoltageCell1));
 #endif
     lastMillisFrame2=millis();
 
@@ -168,7 +185,6 @@ void loop() {
   if( (lastMillisFrame3 + 5000) <=millis()) {
     SendTemperature(temperature/10); 
     //SendValue(FRSKY_USERDATA_GPS_ALT_B,max_alt);
-    SendHourMinutes();
     lastMillisFrame3=millis();
     
   }
@@ -225,8 +241,8 @@ void SendCellVoltage(uint8_t cellID, uint16_t voltage) {
 
 void SendTemperature(int16_t tempc) {
   SendValue(FRSKY_USERDATA_TEMP1, tempc);
-  if (tempc>max_temp) max_temp=tempc;
-  SendValue(FRSKY_USERDATA_TEMP2, max_temp);
+  if (tempc<min_temp) min_temp=tempc;
+  //SendValue(FRSKY_USERDATA_TEMP2, min_temp);
 }
 
 void SendAlt(float alt)
@@ -239,10 +255,17 @@ void SendAlt(float alt)
 
 void SendSec() {
   ///SendValue(FRSKY_USERDATA_GPS_SEC, second());
+  unsigned long v_Second = (millis() - startMillis) / 1000;
+  unsigned long v_Minutes = v_Second / 60;
+  v_Second = v_Second - (v_Minutes * 60);
+  SendValue(FRSKY_USERDATA_GPS_SEC, v_Second);
 }
 void SendHourMinutes() {
+  unsigned int v_Second = (millis() - startMillis) / 1000;
+  unsigned int v_Minutes = v_Second / 60;
+  const uint16_t hm=  ( ( v_Minutes& 0x00ff)<<8 )+ (0 & 0x00ff);
   ///const uint16_t hm=  ( ( minute()& 0x00ff)<<8 )+ (hour() & 0x00ff);
-  ///SendValue(FRSKY_USERDATA_GPS_HM,hm);
+  SendValue(FRSKY_USERDATA_GPS_HM,hm);
 }
 
 float getAltitude() {
