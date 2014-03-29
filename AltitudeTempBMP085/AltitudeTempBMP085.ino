@@ -1,4 +1,4 @@
-#include <LiquidCrystal.h>
+//#include <LiquidCrystal.h>
 
 // Author: Grmis, 04/2013
 // Arduino Pro Mini 3.3v connected to BMP085 barometer breackout
@@ -47,7 +47,7 @@ short temperature; // Temperature, in 0.1 degrees.
 short max_temp,min_temp; // Maximum Temperature, in 0.1 degrees.
 long pressure; // in Pa
 float altitude;
-short max_altitude;
+float max_altitude;
 //uint16_t max_alt=0;
 const int AverageValueCount=10;         // the number of values that will be used to calculate a new average value
 int count=0;
@@ -116,19 +116,32 @@ void setup() {
 
 // Read the (factory) calibration data of the pressure sensor
   bmp085Calibration();
-  for (int i=0;i<AverageValueCount;i++) pressure_values[i]=p0;     
-  max_temp=-999;
-  min_temp=999;
-  max_altitude = 0;
+  
+
   //SendValue(FRSKY_USERDATA_VOLTAGE_B,0);
   //SendValue(FRSKY_USERDATA_VOLTAGE_A,0);
   //SendValue(FRSKY_USERDATA_CURRENT,3);
-  delay(2000);
+  
+  //10 mesures pour moyenner
+  for (int i=0;i<AverageValueCount;i++) pressure_values[i]=0;
   altitude=getAltitude();
-  p0 = pressure;
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  altitude=getAltitude();
+  p0 = pressure; // L'altitude de reference est l'altitude courante
+  #ifdef DEBUG
   Serial.print("On met l'altitude à 0. Pression au point 0 : ");
   Serial.println(p0);
-  getAltitude();
+  #endif
+  max_temp=-999;
+  min_temp=999;
+  max_altitude = 0;
   startMillis = millis();
 }
 
@@ -142,25 +155,22 @@ void loop() {
   // Frame to send every 300ms
   if( (lastMillisFrame1 + 300) <=millis()) {
   ledOn();
-  SendAlt(altitude);
-   SendValue(FRSKY_USERDATA_TEMP2 , max_altitude);
+  SendAlt(max_altitude);
+   SendValue(FRSKY_USERDATA_TEMP2 , altitude);
     lastMillisFrame1=millis();
    ledOff();  
 
 
   // Frame to send every 2s
   if( (lastMillisFrame2 + 2000) <=millis()) {
-    if (altitude>max_altitude && altitude - 10 < max_altitude) max_altitude=altitude;
     SendCellVoltage(0,ReadVoltage(PIN_VoltageCell1));
-    SendCellVoltage(1,ReadVoltage(PIN_VoltageCell2));
-    //SendCellVoltage(2,ReadVoltage(PIN_VoltageCell3));
-    //SendCellVoltage(0,850);
-    //SendCellVoltage(1,852);
+    SendCellVoltage(1,ReadVoltage(PIN_VoltageCell2) * 2);//On multiplie par 2 carpontdiviseur de tension 1:2
     SendSec();
-    if( ((millis() - startMillis) / 60000) != ((lastMillisFrame2 - startMillis) / 60000))
-    {
+    //On transmet les heures/minutes que l'on a changé de minutes
+    //if( ((millis() - startMillis) / 60000) != ((lastMillisFrame2 - startMillis) / 60000))
+    //{
       SendHourMinutes();
-    }
+    //}
 #ifdef DEBUG
     Serial.print("Temperature: ");
     Serial.print(temperature, DEC);
@@ -172,12 +182,17 @@ void loop() {
     Serial.print("Altitude: ");
     Serial.print(altitude, 2);
     Serial.println(" m");
+    Serial.print("Max : ");
+    Serial.print(max_altitude, 2);
+    Serial.println(" m");
     Serial.println((millis()-lastMillisFrame2)/n);
     Serial.println(n);n=0;
     Serial.print("vcc = ");
     Serial.println(readVccMv());
     Serial.print("Cell1 = ");
     Serial.println(ReadVoltage(PIN_VoltageCell1));
+    Serial.print("Cell2 = ");
+    Serial.println(ReadVoltage(PIN_VoltageCell2)*2);
 #endif
     lastMillisFrame2=millis();
 
@@ -277,13 +292,23 @@ float getAltitude() {
   float average_pressure=0;
   for (int i=0;i<AverageValueCount;i++) average_pressure+=(float) pressure_values[i];
   average_pressure/=p0*AverageValueCount;
-  return ((float)44330 * (1 - pow(average_pressure, 0.190295)));
+  //return ((float)44330 * (1 - pow(average_pressure, 0.190295)));
+  float v_alt = ((float)44330 * (1 - pow(average_pressure, 0.190295)));
+  if (v_alt > max_altitude)
+  {
+    max_altitude=v_alt;
+    #ifdef DEBUG
+    Serial.print("Chgt max : ");
+    Serial.print(max_altitude, 2);
+    Serial.println(" m");
+    #endif
+  }
+  return v_alt;
 }
 
 void ledOn() {
   digitalWrite(PIN_Led,1);
 }
-
 
 void ledOff() {
   digitalWrite(PIN_Led,0);
